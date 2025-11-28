@@ -1,0 +1,44 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h1 class="page-title">Admin Panel</h1>
+
+<div class="cards">
+  {% for patient in patients %}
+  <div class="card admin-card {% if patient.status=='Called' %}is-called{% elif patient.status=='Done' %}is-done{% endif %}">
+    <div class="admin-card-top">
+      <div class="admin-name">{{ patient.name }}</div>
+      <span class="badge">
+        {% if patient.room == 'Extraction' %}
+          Extraction Area
+        {% elif patient.room == 'Xray' %}
+          X-ray Room
+        {% elif patient.room == 'ECG' %}
+          ECG / Ultrasound
+        {% else %}
+          Room {{ patient.room }}
+        {% endif %}
+      </span>
+    </div>
+
+    <div class="admin-meta">
+      <span class="status">Status: <strong>{{ patient.status }}</strong></span>
+    </div>
+
+    <div class="admin-actions">
+      {% if patient.status == 'Waiting' %}
+        <a href="{{ url_for('call', patient_id=patient.id) }}" class="btn primary">Call</a>
+      {% elif patient.status == 'Called' %}
+        <a href="{{ url_for('recall', patient_id=patient.id) }}" class="btn">Recall</a>
+        <a href="{{ url_for('done', patient_id=patient.id) }}" class="btn danger">Done</a>
+      {% elif patient.status == 'Done' %}
+        <a href="{{ url_for('delete_patient', patient_id=patient.id) }}"
+           class="btn danger"
+           onclick="return confirm('Are you sure you want to delete {{ patient.name }}?');">
+           Delete
+        </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

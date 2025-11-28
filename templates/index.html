@@ -1,0 +1,25 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h1 class="page-title">Patient Registration</h1>
+
+<form method="POST" class="card form-card">
+  <div class="form-row">
+    <label for="name">Full name</label>
+    <input type="text" id="name" name="name" placeholder="Juan Dela Cruz" required>
+  </div>
+
+  <div class="form-row">
+    <label for="room">Room / Area</label>
+    <select id="room" name="room" required>
+      <option value="">Select...</option>
+      {% for value, label in rooms %}
+        <option value="{{ value }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn primary">Register</button>
+  </div>
+</form>
+{% endblock %}

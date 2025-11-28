@@ -1,0 +1,173 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h1 class="page-title">Now Serving</h1>
+
+<div class="display-grid" id="display-grid">
+  <div class="display-card" id="room1"><span class="room-label">Room 1</span><div class="slot"></div></div>
+  <div class="display-card" id="room2"><span class="room-label">Room 2</span><div class="slot"></div></div>
+  <div class="display-card" id="room3"><span class="room-label">Room 3</span><div class="slot"></div></div>
+  <div class="display-card" id="room4"><span class="room-label">Room 4</span><div class="slot"></div></div>
+  <div class="display-card" id="room5"><span class="room-label">Room 5</span><div class="slot"></div></div>
+  <div class="display-card" id="extraction"><span class="room-label">Extraction Area</span><div class="slot"></div></div>
+  <div class="display-card" id="xray"><span class="room-label">X-ray Room</span><div class="slot"></div></div>
+  <div class="display-card" id="ecg"><span class="room-label">ECG / Ultrasound</span><div class="slot"></div></div>
+</div>
+
+<script>
+// --------------------------------------------------
+// GLOBAL STATE
+// --------------------------------------------------
+let lastPatients = [null,null,null,null,null,null,null,null];
+let selectedVoice = null;
+
+// --------------------------------------------------
+// VOICE SELECTION (tries Microsoft David / US male first)
+// --------------------------------------------------
+function chooseVoice() {
+  const voices = speechSynthesis.getVoices();
+  if (!voices || voices.length === 0) return null;
+
+  const preferredNames = [
+    'Microsoft David - English (United States)',
+    'Microsoft David Desktop - English (United States)',
+    'Google US English',
+    'en-US Male',
+    'Microsoft Mark - English (United States)',
+    'English United States',
+  ];
+
+  for (const name of preferredNames) {
+    const exact = voices.find(v => v.name === name);
+    if (exact) return exact;
+  }
+
+  const partial = voices.find(v =>
+    v.name.includes('David') ||
+    v.name.includes('US') ||
+    v.name.includes('English')
+  );
+  if (partial) return partial;
+
+  const english = voices.find(v => v.lang && v.lang.startsWith('en'));
+  return english || voices[0] || null;
+}
+
+function initVoices() {
+  function load() {
+    const voices = speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      selectedVoice = chooseVoice();
+    }
+  }
+  load();
+  speechSynthesis.onvoiceschanged = load;
+}
+
+// --------------------------------------------------
+// SPEECH HANDLERS
+// --------------------------------------------------
+function resetTTS() {
+  try {
+    speechSynthesis.cancel();
+    speechSynthesis.resume();
+  } catch (e) {}
+}
+
+function speakPatient(name, areaLabel) {
+  resetTTS();
+
+  const msg = new SpeechSynthesisUtterance(
+    `Patient ${name}, please proceed to ${areaLabel}.`
+  );
+
+  msg.lang = selectedVoice?.lang || 'en-US';
+  msg.pitch = 0.95;
+  msg.rate = 0.98;
+  msg.volume = 1;
+
+  if (selectedVoice) {
+    msg.voice = selectedVoice;
+  }
+
+  // Instant speak, minimal delay
+  setTimeout(() => {
+    speechSynthesis.speak(msg);
+  }, 120);
+}
+
+// Keep engine alive (fixes long-delay issues in some browsers)
+setInterval(() => {
+  try { speechSynthesis.resume(); } catch (e) {}
+}, 800);
+
+// --------------------------------------------------
+// UPDATE DISPLAY & TRIGGER TTS
+// --------------------------------------------------
+function prettyLabelByIndex(index) {
+  // MUST match order in /api/current
+  switch (index) {
+    case 0: return 'Room 1';
+    case 1: return 'Room 2';
+    case 2: return 'Room 3';
+    case 3: return 'Room 4';
+    case 4: return 'Room 5';
+    case 5: return 'the Extraction Area';
+    case 6: return 'the X-ray Room';
+    case 7: return 'the ECG and Ultrasound Room';
+    default: return 'the consultation room';
+  }
+}
+
+async function updateDisplay() {
+  try {
+    const res = await fetch('/api/current', { cache: 'no-store' });
+    const data = await res.json();
+
+    const ids = ['room1','room2','room3','room4','room5','extraction','xray','ecg'];
+
+    ids.forEach((id, i) => {
+      const el = document.getElementById(id);
+      const slot = el.querySelector('.slot');
+      const p = data[i];
+
+      if (!p) {
+        slot.innerHTML = '<span class="empty">—</span>';
+        lastPatients[i] = null;
+        return;
+      }
+
+      slot.innerHTML = `
+        <div class="patient">
+          <span class="patient-name">${p.name}</span>
+          <span class="patient-room">
+            Please proceed to <strong>${prettyLabelByIndex(i).replace(/^the /, '')}</strong>
+          </span>
+        </div>
+      `;
+
+      const token = p.id + ':' + p.token;
+      if (lastPatients[i] !== token) {
+        lastPatients[i] = token;
+
+        // Flash animation
+        el.classList.add('active');
+        setTimeout(() => el.classList.remove('active'), 6000);
+
+        // TTS
+        const spokenLabel = prettyLabelByIndex(i);
+        speakPatient(p.name, spokenLabel);
+      }
+    });
+  } catch (err) {
+    console.error('Error updating display:', err);
+  }
+}
+
+// --------------------------------------------------
+// STARTUP
+// --------------------------------------------------
+initVoices();
+setTimeout(updateDisplay, 400);
+setInterval(updateDisplay, 800);
+</script>
+{% endblock %}
